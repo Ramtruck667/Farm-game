@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prairie Farm - Mini Game</title>
+<style>
+  :root{--bg:#0b1b1b;--panel:#112626;--panel2:#143030;--text:#e7f6f6;--accent:#7ad6c9;--money:#ffd166;--good:#8bd17c;--warn:#ffce6b;--bad:#ff7b7b}
+  *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  body{margin:0;background:linear-gradient(180deg,#062020 0%,#0b1b1b 45%,#0f1f1f 100%);color:var(--text)}
+  header{padding:14px 16px;background:linear-gradient(90deg,var(--panel),var(--panel2));display:flex;gap:12px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:10;border-bottom:1px solid #1d3a3a}
+  header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px}
+  .pill{padding:6px 10px;border:1px solid #214444;border-radius:10px;background:#0e2424}
+  .money{color:var(--money);font-weight:700}
+  .wrap{max-width:1100px;margin:16px auto;padding:0 16px;display:grid;grid-template-columns:1fr 360px;gap:16px}
+  @media (max-width:1000px){.wrap{grid-template-columns:1fr}}
+  .panel{background:linear-gradient(180deg,var(--panel),#0d2323);border:1px solid #1b3b3b;border-radius:12px;padding:12px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .plot{aspect-ratio:1/1;border-radius:10px;border:1px dashed #2b4d4d;background:#0e2222;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:transform .08s}
+  .plot:hover{transform:scale(1.02)}
+  .plot .info{position:absolute;bottom:6px;left:6px;font-size:12px;opacity:.8}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button{background:#123333;border:1px solid #235757;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
+  button:hover{background:#164141}
+  button.primary{background:#1b6b60;border-color:#279b8a;font-weight:700}
+  .shop-item{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;border:1px solid #234a4a;background:#0f2525;margin-bottom:8px}
+  .badge{padding:2px 8px;border-radius:999px;background:#163f3f;border:1px solid #265f5f;font-size:12px}
+  .note{font-size:12px;opacity:.85}
+  .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .section-title{margin:8px 0 6px 0;font-size:14px;opacity:.9;text-transform:uppercase;letter-spacing:.6px}
+  .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .tiny{font-size:12px;opacity:.9}
+  .log{max-height:160px;overflow:auto;font-size:13px;padding-right:4px}
+  .target{outline:2px solid var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌾 Prairie Farm</h1>
+  <div class="pill">Season: <span id="season">Spring</span></div>
+  <div class="pill">Day: <span id="day">1</span></div>
+  <div class="pill">Weather: <span id="weather">Sunny</span></div>
+  <div class="pill">Cash: <span id="cash" class="money">$2,500</span></div>
+  <div class="pill">Fuel: <span id="fuel">100</span>L</div>
+  <button id="endDay" class="primary">End Day ▶</button>
+  <button id="saveBtn">Save</button>
+  <button id="resetBtn">Reset</button>
+</header>
+
+<div class="wrap">
+  <main class="panel">
+    <div class="row">
+      <div class="section-title">Fields (Tap a plot, then choose a crop)</div>
+      <div class="tiny">Tip: Weather & seasons affect growth and yield.</div>
+    </div>
+    <div class="grid" id="fieldGrid"></div>
+    <div style="height:10px"></div>
+    <div class="flex">
+      <button class="badge" data-act="plant" data-crop="wheat">🌾 Plant Wheat ($35)</button>
+      <button class="badge" data-act="plant" data-crop="barley">🌿 Plant Barley ($30)</button>
+      <button class="badge" data-act="plant" data-crop="canola">🟡 Plant Canola ($45)</button>
+      <button class="badge" data-act="till">🧑‍🌾 Till (free)</button>
+      <button class="badge" data-act="harvest">🚜 Harvest</button>
+      <button class="badge" data-act="fertilize">🧪 Fertilize ($20)</button>
+      <button class="badge" data-act="spray">🪲 Spray ($25)</button>
+      <button class="badge" data-act="sell">💱 Sell All Grain</button>
+    </div>
+  </main>
+
+  <aside class="panel">
+    <div class="section-title">Market Prices (change daily)</div>
+    <div class="row tiny"><span>Wheat</span><span id="p_wheat">$4.10/bu</span></div>
+    <div class="row tiny"><span>Barley</span><span id="p_barley">$3.60/bu</span></div>
+    <div class="row tiny"><span>Canola</span><span id="p_canola">$10.50/bu</span></div>
+    <div class="section-title">Inventory</div>
+    <div class="tiny">Wheat: <span id="inv_wheat">0</span> bu</div>
+    <div class="tiny">Barley: <span id="inv_barley">0</span> bu</div>
+    <div class="tiny">Canola: <span id="inv_canola">0</span> bu</div>
+    <div class="section-title">Shop</div>
+    <div class="shop-item"><span>⛽ Fuel +50L</span><span>$60</span><button data-shop="fuel">Buy</button></div>
+    <div class="shop-item"><span>🧪 Fertilizer +2 uses</span><span>$35</span><button data-shop="fert">Buy</button></div>
+    <div class="shop-item"><span>🪲 Chemical +2 uses</span><span>$40</span><button data-shop="chem">Buy</button></div>
+    <div class="note">Fertilizer boosts yield. Chemical protects from pests.</div>
+    <div class="section-title">Farm Log</div>
+    <div id="log" class="log"></div>
+  </aside>
+</div>
+
+<script>
+const CROPS = {
+  wheat: { name:"Wheat", emoji:"🌾", days:6, seedCost:35, baseYield: 45, fuelPerAction: 4 },
+  barley:{ name:"Barley", emoji:"🌿", days:5, seedCost:30, baseYield: 50, fuelPerAction: 3 },
+  canola:{ name:"Canola", emoji:"🟡", days:7, seedCost:45, baseYield: 32, fuelPerAction: 5 }
+};
+let state = {
+  day:1, season:"Spring", cash:2500, fuel:100,
+  prices:{wheat:4.1, barley:3.6, canola:10.5},
+  inv:{wheat:0, barley:0, canola:0},
+  fert:2, chem:2,
+  plots:Array.from({length:9},()=>({crop:null, days:0, fert:0, sprayed:false, tilled:false})),
+  selectedPlot:0, log:[]
+};
+const el = s => document.querySelector(s);
+const fmt = n => "$"+n.toFixed(2);
+function log(msg){ state.log.unshift("Day "+state.day+": "+msg); renderLog(); }
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function clamp(n,min,max){ return Math.max(min, Math.min(max,n)); }
+function save(){ localStorage.setItem("prairie-farm", JSON.stringify(state)); }
+function load(){ const s = localStorage.getItem("prairie-farm"); if(s){ try{ state = {...state, ...JSON.parse(s)}; }catch(e){} } }
+
+function renderHeader(){ el("#day").textContent=state.day; el("#season").textContent=state.season; el("#cash").textContent=fmt(state.cash); el("#fuel").textContent=Math.round(state.fuel); }
+function plotLabel(p){ if(!p.crop) return "Bare"; const c=CROPS[p.crop]; return `${c.name} (${p.days}/${c.days})`; }
+function renderField(){
+  const grid = el("#fieldGrid"); grid.innerHTML="";
+  state.plots.forEach((p,idx)=>{
+    const d = document.createElement("div"); d.className="plot"+(state.selectedPlot===idx?" target":"");
+    const label = document.createElement("div"); label.className="info"; label.textContent=plotLabel(p);
+    const content = document.createElement("div"); content.style.textAlign="center";
+    content.innerHTML = p.crop ? `<div style="font-size:38px">${CROPS[p.crop].emoji}</div>` : `<div style="font-size:32px;opacity:.7">🟫</div><div class="tiny">Unseeded</div>`;
+    d.appendChild(content); d.appendChild(label);
+    d.title = p.tilled ? "Tilled" : "Untilied";
+    d.onclick=()=>{ state.selectedPlot = idx; renderField(); };
+    grid.appendChild(d);
+  });
+}
+function renderPrices(){ ["wheat","barley","canola"].forEach(k=> el("#p_"+k).textContent = fmt(state.prices[k])+"/bu"); }
+function renderInv(){ ["wheat","barley","canola"].forEach(k=> el("#inv_"+k).textContent = Math.round(state.inv[k])); }
+function renderLog(){ el("#log").innerHTML = state.log.slice(0,100).map(x=>"<div>• "+x+"</div>").join(""); }
+function renderAll(){ renderHeader(); renderField(); renderPrices(); renderInv(); renderLog(); }
+
+function ensureFuel(need){ if(state.fuel < need){ log("Not enough fuel — buy more in the shop."); return false;} state.fuel -= need; return true; }
+function plant(crop){
+  const p = state.plots[state.selectedPlot]; const c = CROPS[crop];
+  if(!p.tilled){ log("You need to till this plot first."); return; }
+  if(p.crop){ log("Plot already has "+CROPS[p.crop].name+"."); return; }
+  if(state.cash < c.seedCost){ log("Not enough cash for "+c.name+" seed."); return; }
+  if(!ensureFuel(c.fuelPerAction)) return;
+  state.cash -= c.seedCost; Object.assign(p,{ crop, days:0, fert:0, sprayed:false });
+  log(`Planted ${c.name} on plot ${state.selectedPlot+1}.`); renderAll(); save();
+}
+function till(){ const p = state.plots[state.selectedPlot]; if(!ensureFuel(2)) return; p.tilled=true; log(`Tilled plot ${state.selectedPlot+1}.`); renderAll(); save(); }
+function fertilize(){ const p = state.plots[state.selectedPlot]; if(!p.crop){ log("Nothing planted here."); return; } if(state.fert<=0){ log("No fertilizer. Buy more in shop."); return; } if(!ensureFuel(1)) return; state.fert--; p.fert++; log(`Fertilized ${CROPS[p.crop].name} (+yield).`); renderAll(); save(); }
+function spray(){ const p = state.plots[state.selectedPlot]; if(!p.crop){ log("Nothing planted here."); return; } if(state.chem<=0){ log("No chemical. Buy more in shop."); return; } if(!ensureFuel(1)) return; state.chem--; p.sprayed=true; log(`Sprayed ${CROPS[p.crop].name} (pest protected).`); renderAll(); save(); }
+function harvest(){
+  const p = state.plots[state.selectedPlot]; if(!p.crop){ log("Nothing to harvest."); return; }
+  const c = CROPS[p.crop]; if(p.days < c.days){ log(`${c.name} not mature yet (${p.days}/${c.days}).`); return; }
+  if(!ensureFuel(3)) return;
+  const weatherMod = currentWeather.yieldMod;
+  const fertMod = 1 + (p.fert*0.15);
+  const pestMod = p.sprayed || Math.random()>0.2 ? 1 : 0.8;
+  const randomMod = rand(0.9,1.1);
+  const yieldBu = Math.max(5, c.baseYield * weatherMod * fertMod * pestMod * randomMod);
+  state.inv[p.crop] += yieldBu;
+  log(`Harvested ${Math.round(yieldBu)} bu of ${c.name}.`);
+  state.plots[state.selectedPlot] = {crop:null, days:0, fert:0, sprayed:false, tilled:false};
+  renderAll(); save();
+}
+function sellAll(){
+  let total = 0; for(const k of ["wheat","barley","canola"]){ const amt=state.inv[k]; if(amt<=0) continue; const sale=amt*state.prices[k]; state.cash+=sale; total+=sale; state.inv[k]=0; }
+  if(total>0) log("Sold grain for "+fmt(total)+" total."); else log("No grain to sell."); renderAll(); save();
+}
+
+document.addEventListener("click",(e)=>{
+  const b = e.target.closest("button.badge");
+  if(b && b.dataset.act){
+    const act=b.dataset.act;
+    if(act==="plant") plant(b.dataset.crop);
+    if(act==="till") till();
+    if(act==="fertilize") fertilize();
+    if(act==="spray") spray();
+    if(act==="harvest") harvest();
+    if(act==="sell") sellAll();
+  }
+  const shop = e.target.closest("button[data-shop]");
+  if(shop){
+    const k = shop.dataset.shop;
+    if(k==="fuel"){ if(state.cash>=60){ state.cash-=60; state.fuel+=50; log("Bought 50L fuel."); } else log("Not enough cash."); }
+    if(k==="fert"){ if(state.cash>=35){ state.cash-=35; state.fert+=2; log("Bought fertilizer (2)."); } else log("Not enough cash."); }
+    if(k==="chem"){ if(state.cash>=40){ state.cash-=40; state.chem+=2; log("Bought chemical (2)."); } else log("Not enough cash."); }
+    renderAll(); save();
+  }
+});
+
+const SEASONS = ["Spring","Summer","Fall","Winter"];
+let currentWeather = { name:"Sunny", yieldMod:1.0, growth:1.0 };
+function rollWeather(){
+  const s = state.season; const r = Math.random(); let w;
+  if(s==="Spring"){
+    if(r<0.15) w={name:"Frost", yieldMod:0.9, growth:0.8};
+    else if(r<0.35) w={name:"Rain", yieldMod:1.1, growth:1.2};
+    else if(r<0.45) w={name:"Wind", yieldMod:0.95, growth:0.95};
+    else w={name:"Sunny", yieldMod:1.0, growth:1.0};
+  }else if(s==="Summer"){
+    if(r<0.2) w={name:"Heat", yieldMod:0.95, growth:1.1};
+    else if(r<0.35) w={name:"Rain", yieldMod:1.1, growth:1.2};
+    else if(r<0.45) w={name:"Hail", yieldMod:0.8, growth:0.9};
+    else w={name:"Sunny", yieldMod:1.0, growth:1.0};
+  }else if(s==="Fall"){
+    if(r<0.15) w={name:"Early Snow", yieldMod:0.9, growth:0.8};
+    else if(r<0.35) w={name:"Rain", yieldMod:1.05, growth:1.0};
+    else w={name:"Sunny", yieldMod:1.0, growth:0.95};
+  }else{
+    if(r<0.6) w={name:"Snow", yieldMod:0.7, growth:0.2};
+    else w={name:"Cold Sun", yieldMod:0.85, growth:0.5};
+  }
+  currentWeather = w; el("#weather").textContent = currentWeather.name;
+}
+function updatePrices(){
+  const drift = (v,vol) => clamp(v + rand(-0.3,0.35), vol*0.5, vol*2.2);
+  state.prices.wheat = parseFloat((drift(state.prices.wheat,4.1)).toFixed(2));
+  state.prices.barley = parseFloat((drift(state.prices.barley,3.6)).toFixed(2));
+  state.prices.canola = parseFloat((drift(state.prices.canola,10.5)).toFixed(2));
+}
+function advanceDay(){
+  for(const p of state.plots){
+    if(p.crop){
+      const c = CROPS[p.crop];
+      const growth = Math.random()<0.95 ? currentWeather.growth : currentWeather.growth*0.8;
+      p.days = clamp(p.days + (1*growth), 0, c.days);
+      if(state.season==="Summer" && currentWeather.name==="Hail" && Math.random()<0.3){
+        p.days = Math.max(0, p.days - 1);
+        log(`Hail set back a plot of ${CROPS[p.crop].name}.`);
+      }
+    }
+  }
+  state.day++;
+  if(state.day%12===1){
+    const idx = (SEASONS.indexOf(state.season)+1)%SEASONS.length;
+    state.season = SEASONS[idx];
+    log("Season changed to "+state.season+".");
+  }
+  rollWeather(); updatePrices(); renderAll(); save();
+}
+document.getElementById("endDay").onclick = advanceDay;
+document.getElementById("saveBtn").onclick = ()=>{ save(); log("Game saved."); };
+document.getElementById("resetBtn").onclick = ()=>{ if(confirm("Reset your farm?")){ localStorage.removeItem("prairie-farm"); location.reload(); } };
+
+load(); rollWeather(); renderAll(); log("Welcome to Prairie Farm! Tap a plot, till it, then plant.");
+</script>
+</body>
+</html>
